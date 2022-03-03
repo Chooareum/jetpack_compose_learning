@@ -1,80 +1,75 @@
 package com.example.jetpack_compose_learning
 
-import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material.Button
+import androidx.compose.material.Text
+import androidx.compose.material.TextField
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.focusModifier
-import androidx.compose.ui.graphics.Color.Companion.Black
-import androidx.compose.ui.graphics.Color.Companion.Blue
-import androidx.compose.ui.graphics.Color.Companion.Green
-import androidx.compose.ui.graphics.Color.Companion.White
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import com.example.jetpack_compose_learning.ui.theme.Jetpack_compose_learningTheme
-import kotlinx.coroutines.launch
 
 
 @ExperimentalComposeUiApi
 class MainActivity : ComponentActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
-            val viewModel = viewModel<MainViewModel>()
-
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ){
-                Text(
-                    viewModel.data.value,
-                    fontSize = 30.sp
-                )
-                Button(onClick = {
-                    viewModel.changeValue()
-                }){
-                    Text("변경")
-                }
-            }
+            HomeScreen()
         }
     }
 }
 
-class MainViewModel : ViewModel(){
-    private val _data = mutableStateOf("Hello")
-    val data: State<String> = _data
+@Composable
+fun HomeScreen(viewModel: MainViewModel = viewModel()){
 
-    fun changeValue(){
-        _data.value = "World"
+    val text1: MutableState<String> = remember{
+        mutableStateOf("Hello World")
+    }
+
+    var text2: String by remember {
+        mutableStateOf("Hello World")
+    }
+
+
+    val (text: String, setText: (String) -> Unit ) = remember{
+        mutableStateOf("Hello World")
+    }
+
+    val text3: State<String> = viewModel.liveData.observeAsState("Hello World")
+
+    Column() {
+
+        Text("Hello World")
+        Button(onClick = {
+            text1.value = "변경"
+            print(text1.value)
+            text2 = "변경"
+            print(text2)
+            setText("변경")
+            viewModel.changeValue("변경")
+        }) {
+            Text("click")
+        }
+        TextField(value = text, onValueChange = setText)
+    }
+}
+
+class MainViewModel: ViewModel(){
+    private val _value: MutableState<String> = mutableStateOf("Hello World")
+    val value: State<String> = _value
+
+    private val _liveData = MutableLiveData<String>()
+    val liveData: LiveData<String> = _liveData
+
+    fun changeValue(value: String) {
+          _value.value = value
     }
 }
