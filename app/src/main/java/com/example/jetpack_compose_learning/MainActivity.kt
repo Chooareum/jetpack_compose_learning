@@ -33,6 +33,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -43,12 +44,12 @@ import kotlinx.coroutines.launch
 
 @ExperimentalComposeUiApi
 class MainActivity : ComponentActivity() {
-    private val viewModel by viewModels<MainViewModel>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
+            val viewModel = viewModel<MainViewModel>()
 
             Column(
                 modifier = Modifier.fillMaxSize(),
@@ -60,7 +61,7 @@ class MainActivity : ComponentActivity() {
                     fontSize = 30.sp
                 )
                 Button(onClick = {
-                    viewModel.data.value = "World"
+                    viewModel.changeValue()
                 }){
                     Text("변경")
                 }
@@ -70,6 +71,10 @@ class MainActivity : ComponentActivity() {
 }
 
 class MainViewModel : ViewModel(){
-    val data = mutableStateOf("Hello")
+    private val _data = mutableStateOf("Hello")
+    val data: State<String> = _data
 
+    fun changeValue(){
+        _data.value = "World"
+    }
 }
