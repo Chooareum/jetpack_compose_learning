@@ -6,6 +6,9 @@
         <entry key="../../../../../layout/compose-model-1646187982076.xml" value="0.5008445945945946" />
         <entry key="../../../../../layout/compose-model-1646298192620.xml" value="0.33" />
         <entry key="app/src/main/res/drawable-v24/ic_launcher_foreground.xml" value="0.299" />
+        <entry key="app/src/main/res/drawable/ic_baseline_pause_24.xml" value="0.1195" />
+        <entry key="app/src/main/res/drawable/ic_baseline_play_arrow_24.xml" value="0.1195" />
+        <entry key="app/src/main/res/drawable/ic_baseline_refresh_24.xml" value="0.1195" />
         <entry key="app/src/main/res/drawable/ic_baseline_sentiment_dissatisfied_24.xml" value="0.2" />
         <entry key="app/src/main/res/drawable/ic_baseline_sentiment_satisfied_24.xml" value="0.299" />
         <entry key="app/src/main/res/drawable/ic_baseline_sentiment_very_dissatisfied_24.xml" value="0.299" />
