@@ -1,167 +1,132 @@
 package com.example.jetpack_compose_learning
 
-import android.Manifest
 import android.app.Application
-import android.content.ContentUris
-import android.content.pm.PackageManager
-import android.net.Uri
+import android.content.Context
+import android.content.pm.ActivityInfo
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Bundle
-import android.provider.MediaStore
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.activity.viewModels
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material.Button
-import androidx.compose.material.Card
-import androidx.compose.material.Text
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.rememberImagePainter
-import com.google.accompanist.pager.*
-import kotlin.math.absoluteValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleObserver
+import androidx.lifecycle.OnLifecycleEvent
 
 
-@ExperimentalPagerApi
 @ExperimentalComposeUiApi
 class MainActivity : ComponentActivity() {
+    private val viewModel by viewModels<MainViewModel>()
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        //화면이 꺼지지 않게 하기
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        //화면이 가로 모드로 고정되게 하기
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         super.onCreate(savedInstanceState)
+
+        lifecycle.addObserver(viewModel)
+
         setContent {
-            val viewModel = viewModel<MainViewModel>()
-            var granted by remember{ mutableStateOf(false) }
+            TiltScreen(x = viewModel.x.value, y = viewModel.y.value)
 
-            val launcher =
-                rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){ isGranted ->
-                    granted = isGranted
-                }
-            if(ContextCompat.checkSelfPermission(
-                    this,
-                    android.Manifest.permission.READ_EXTERNAL_STORAGE,
-                ) == PackageManager.PERMISSION_GRANTED ){
-                granted = true
-            }
-            if(granted){
-                viewModel.fetchPhotos()
-                HomeScreen(photoUris = viewModel.photoUris.value)
-            }else{
-                PermissionRequsettScreen {
-                    launcher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
-                }
-            }
         }
     }
 }
 
-class MainViewModel(application: Application) : AndroidViewModel(application){
-    private val _photoUris = mutableStateOf(emptyList<Uri>())
-    val photoUris: State<List<Uri>> = _photoUris
+class MainViewModel(application: Application) : AndroidViewModel(application), SensorEventListener,
+    LifecycleObserver {
 
-    fun fetchPhotos(){
-        val uris = mutableListOf<Uri>()
-        getApplication<Application>().contentResolver.query(
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-            null,
-            null,
-            null,
-            "${MediaStore.Images.ImageColumns.DATE_TAKEN} DESC"
-        )?.use{ cursor ->
-            val idIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+    private val _x = mutableStateOf(0f)
+    val x : State<Float> = _x
 
-            while (cursor.moveToNext()) {
-                val id = cursor.getLong(idIndex)
+    private val _y = mutableStateOf(0f)
+    val y : State<Float> = _y
 
-                val contentUri = ContentUris.withAppendedId(
-                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                    id,
-                )
-                uris.add(contentUri)
-            }
-        }
-        _photoUris.value=uris
+    private val sensorManager by lazy{
+        application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    }
+    @OnLifecycleEvent(Lifecycle.Event.ON_RESUME)
+    fun registerSensor(){
+        sensorManager.registerListener(
+            this,
+            sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
+            SensorManager.SENSOR_DELAY_NORMAL,
+        )
+
+
+    }
+
+    @OnLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+    fun unregisterSensor(){
+        sensorManager.unregisterListener(this)
+    }
+
+
+    override fun onSensorChanged(event: SensorEvent?) {
+       event?.let{
+           _x.value = event.values[0]
+           _y.value = event.values[1]
+       }
+    }
+
+    override fun onAccuracyChanged(p0: Sensor?, p1: Int) {
+
     }
 }
 
 @Composable
-fun PermissionRequsettScreen(onClick: () -> Unit){
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("권한이 허용되지 않았씁니다.")
-        Button(onClick = onClick) {
-            Text("권한 요청")
-        }
+fun TiltScreen(x: Float, y: Float){
+
+    val yCoord = x * 20
+    val xCoord = y * 20
+
+    Canvas(modifier = Modifier.fillMaxSize()){
+        val centerX = size.width/2
+        val centerY = size.height/2
+
+        //바깥 원
+        drawCircle(
+            color = androidx.compose.ui.graphics.Color.Black,
+            radius = 100f,
+            center = Offset(centerX, centerY),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(),
+        )
+
+        //초록 원
+        drawCircle(
+            color = androidx.compose.ui.graphics.Color.Green,
+            radius = 100f,
+            center = Offset(xCoord + centerX, yCoord+ centerY),
+
+        )
+
+        //가운데 십자가
+        drawLine(
+            color = Color.Black,
+            start = Offset(centerX - 20, centerY),
+            end = Offset(centerX + 20 , centerY),
+        )
+
+        drawLine(
+            color = Color.Black,
+            start = Offset(centerX, centerY - 20),
+            end = Offset(centerX , centerY + 20 ),
+        )
+
+
     }
 }
-
-@ExperimentalPagerApi
-@Composable
-fun HomeScreen(photoUris: List<Uri>){
-    val pagerState = rememberPagerState()
-
-    Column(Modifier.fillMaxSize()){
-        HorizontalPager(
-            state = pagerState,
-            count = photoUris.size,
-            modifier = Modifier
-                .weight(1f)
-                .padding(16.dp)
-                .fillMaxSize(),
-            ) { pageIndex ->
-                Card(
-                    modifier = Modifier
-                        .graphicsLayer {
-                            val pagerOffset = calculateCurrentOffsetForPage(pageIndex).absoluteValue
-
-                            lerp(
-                                start  =0.85f,
-                                stop = 1f,
-                                fraction = 1f - pagerOffset.coerceIn(0f, 1f)
-                            ).also{scale ->
-                                scaleX = scale
-                                scaleY = scale
-                            }
-
-                            alpha = lerp(
-                                start  =0.5f,
-                                stop = 1f,
-                                fraction = 1f - pagerOffset.coerceIn(0f, 1f)
-                            )
-                        }
-
-                ) {
-                    Image(
-                        painter = rememberImagePainter(
-                            data = photoUris[pageIndex],
-                        ),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                        )
-                    }
-                }
-            HorizontalPagerIndicator(
-                pagerState = pagerState,
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .padding(16.dp)
-                )
-    }
-}
-
-private fun lerp(start: Float, stop: Float, fraction: Float): Float =
-    (1-fraction) * start + fraction * stop
