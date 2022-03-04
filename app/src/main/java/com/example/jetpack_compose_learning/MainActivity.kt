@@ -1,146 +1,167 @@
 package com.example.jetpack_compose_learning
 
+import android.Manifest
+import android.app.Application
+import android.content.ContentUris
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.provider.MediaStore
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.Button
+import androidx.compose.material.Card
+import androidx.compose.material.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.flow.collectLatest
+import coil.compose.rememberImagePainter
+import com.google.accompanist.pager.*
+import kotlin.math.absoluteValue
 
 
+@ExperimentalPagerApi
 @ExperimentalComposeUiApi
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             val viewModel = viewModel<MainViewModel>()
-            HomeScreen(viewModel = viewModel)
+            var granted by remember{ mutableStateOf(false) }
 
+            val launcher =
+                rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){ isGranted ->
+                    granted = isGranted
+                }
+            if(ContextCompat.checkSelfPermission(
+                    this,
+                    android.Manifest.permission.READ_EXTERNAL_STORAGE,
+                ) == PackageManager.PERMISSION_GRANTED ){
+                granted = true
+            }
+            if(granted){
+                viewModel.fetchPhotos()
+                HomeScreen(photoUris = viewModel.photoUris.value)
+            }else{
+                PermissionRequsettScreen {
+                    launcher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+                }
+            }
         }
     }
 }
 
-@Composable
-fun HomeScreen(viewModel: MainViewModel) {
-    val focusManager = LocalFocusManager.current
-    val (inputUrl, setUrl) = rememberSaveable {
-        mutableStateOf("https://www.google.com")
+class MainViewModel(application: Application) : AndroidViewModel(application){
+    private val _photoUris = mutableStateOf(emptyList<Uri>())
+    val photoUris: State<List<Uri>> = _photoUris
 
+    fun fetchPhotos(){
+        val uris = mutableListOf<Uri>()
+        getApplication<Application>().contentResolver.query(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            null,
+            null,
+            null,
+            "${MediaStore.Images.ImageColumns.DATE_TAKEN} DESC"
+        )?.use{ cursor ->
+            val idIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(idIndex)
+
+                val contentUri = ContentUris.withAppendedId(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    id,
+                )
+                uris.add(contentUri)
+            }
+        }
+        _photoUris.value=uris
     }
-    val scaffoldState = rememberScaffoldState()
+}
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(text = "나만의 웹 브라우저") },
-                actions = {
-                    IconButton(onClick = {
-                        viewModel.undo()
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "back",
-                            tint = androidx.compose.ui.graphics.Color.White,
-                        )
-                    }
-                    IconButton(onClick = {
-                        viewModel.redo()
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowForward,
-                            contentDescription = "forward",
-                            tint = androidx.compose.ui.graphics.Color.White,
+@Composable
+fun PermissionRequsettScreen(onClick: () -> Unit){
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text("권한이 허용되지 않았씁니다.")
+        Button(onClick = onClick) {
+            Text("권한 요청")
+        }
+    }
+}
+
+@ExperimentalPagerApi
+@Composable
+fun HomeScreen(photoUris: List<Uri>){
+    val pagerState = rememberPagerState()
+
+    Column(Modifier.fillMaxSize()){
+        HorizontalPager(
+            state = pagerState,
+            count = photoUris.size,
+            modifier = Modifier
+                .weight(1f)
+                .padding(16.dp)
+                .fillMaxSize(),
+            ) { pageIndex ->
+                Card(
+                    modifier = Modifier
+                        .graphicsLayer {
+                            val pagerOffset = calculateCurrentOffsetForPage(pageIndex).absoluteValue
+
+                            lerp(
+                                start  =0.85f,
+                                stop = 1f,
+                                fraction = 1f - pagerOffset.coerceIn(0f, 1f)
+                            ).also{scale ->
+                                scaleX = scale
+                                scaleY = scale
+                            }
+
+                            alpha = lerp(
+                                start  =0.5f,
+                                stop = 1f,
+                                fraction = 1f - pagerOffset.coerceIn(0f, 1f)
+                            )
+                        }
+
+                ) {
+                    Image(
+                        painter = rememberImagePainter(
+                            data = photoUris[pageIndex],
+                        ),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
                         )
                     }
                 }
-            )
-        },
-        scaffoldState = scaffoldState,
-    ){
-        Column(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxSize()
-        ) {
-            OutlinedTextField(
-                value = inputUrl,
-                onValueChange = setUrl,
-                label = { Text(text = "https://")},
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = {
-                    viewModel.url.value = inputUrl
-                    focusManager.clearFocus()
-                    
-                })
-            )
-            
-            Spacer(modifier = Modifier.heightIn(16.dp))
-            MyWebView(viewModel = viewModel, scaffoldState = scaffoldState, )
-        }
+            HorizontalPagerIndicator(
+                pagerState = pagerState,
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .padding(16.dp)
+                )
     }
 }
 
-@Composable
-fun MyWebView(viewModel: MainViewModel, scaffoldState: ScaffoldState) {
-    val scope = rememberCoroutineScope()
-    val webView = rememberWebView()
-
-    LaunchedEffect(Unit){
-        viewModel.undoShardFlow.collectLatest {
-            if (webView.canGoBack()) {
-                webView.goBack()
-            } else{
-                scaffoldState.snackbarHostState.showSnackbar("더이상 뒤로 갈 수 없음")
-            }
-        }
-    }
-    LaunchedEffect(Unit) {
-        viewModel.redoShardFlow.collectLatest {
-            if (webView.canGoForward()) {
-                webView.goForward()
-            } else {
-                scaffoldState.snackbarHostState.showSnackbar("더이상 앞으로 갈 수 없음")
-            }
-        }
-    }
-
-    AndroidView(
-        modifier = Modifier.fillMaxSize(),
-        factory = { webView },
-        update = { webView ->
-            webView.loadUrl(viewModel.url.value)
-        }
-
-    )
-}
-
-@Composable
-fun rememberWebView(): WebView{
-    val context = LocalContext.current
-    val webView = remember{
-        WebView(context).apply {
-            settings.javaScriptEnabled = true
-            webViewClient = WebViewClient()
-            loadUrl("https://google.com")
-        }
-    }
-    return webView
-}
+private fun lerp(start: Float, stop: Float, fraction: Float): Float =
+    (1-fraction) * start + fraction * stop
